@@ -6,8 +6,8 @@ pub mod prime_time_server {
     use std::net::{TcpListener, TcpStream};
     use std::thread;
 
-    const BUF_SIZE: usize = 65535;
-
+    const BUF_SIZE: usize = 1024 * 16;
+    
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Request<'a> {
         method: &'a str,
