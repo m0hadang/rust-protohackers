@@ -18,87 +18,6 @@ pub mod prime_time_server {
         method: &'a str,
         prime: bool,
     }
-    fn is_prime(number: &serde_json::Number) -> bool {
-        if let Some(n) = number.as_i64() {
-            if n <= 0 || n == 1 {
-                return false;
-            }
-            let max = (n as f64).sqrt() as i64 + 1;
-            for i in 2..max {
-                if n % i == 0 {
-                    return false;
-                }
-            }
-            true
-        } else if let Some(_) = number.as_f64() {
-            // Handle floating point numbers separately
-            // ...
-            false
-        } else {
-            false
-        }
-    }
-    fn is_prime_request(request: &Request) -> Option<bool> {
-        let result: bool = match request.method {
-            "isPrime" => match request.number {
-                _ => is_prime(&request.number),
-            },
-            _ => {
-                return None;
-            }
-        };
-        Some(result)
-    }
-    pub fn parse_request(buf: &[u8; BUF_SIZE], chunk_len: usize) -> Vec<Request> {
-        let mut v: Vec<Request> = Vec::new();
-        let mut start_i: usize = 0;
-        for i in 0..chunk_len {
-            if buf[i] == b'\n' {
-                match serde_json::from_slice(&buf[start_i..i]) {
-                    Ok(request) => v.push(request),
-                    Err(err) => {
-                        let slice_as_string = std::str::from_utf8(&buf[start_i..i]).unwrap();
-                        println!("- not valid json format : {:?}", slice_as_string);
-                        println!("- error : {:?}", err);
-                    }
-                }
-                start_i = i + 1;
-            }
-            if buf[i] == b'\0' {
-                break;
-            }
-        }
-        v
-    }
-    pub fn chunk_read(
-        mut stream: impl Read,
-        buf: &mut [u8; BUF_SIZE],
-        back_buf: &mut [u8; BUF_SIZE],
-        back_buf_end: &mut usize,
-    ) -> io::Result<usize> {
-        buf[..*back_buf_end].copy_from_slice(&back_buf[..*back_buf_end]);
-        let read_len = stream.read(&mut buf[*back_buf_end..])?;
-        let read_len = *back_buf_end + read_len;
-        if read_len == 0 {
-            println!("read len is 0");
-            return Ok(0);
-        }
-
-        let last_newline_idx = buf[..read_len]
-            .iter()
-            .rposition(|&c| c == b'\n')
-            .unwrap_or(0);
-
-        let mut chunk_len: usize = 0;
-        if last_newline_idx == 0 {
-            *back_buf_end = read_len;
-        } else {
-            chunk_len = last_newline_idx + 1;
-            *back_buf_end = read_len - last_newline_idx - 1;
-        }
-        back_buf[..*back_buf_end].copy_from_slice(&buf[chunk_len..read_len]);
-        Ok(chunk_len)
-    }
     // chuck read using buf and back_buf and back_buf_len
     fn reponse(mut stream: TcpStream) {
         println!(
@@ -198,6 +117,87 @@ pub mod prime_time_server {
             Err(err) => {
                 println!("tco bind error : {}", err);
             }
+        }
+    }
+    pub fn chunk_read(
+        mut stream: impl Read,
+        buf: &mut [u8; BUF_SIZE],
+        back_buf: &mut [u8; BUF_SIZE],
+        back_buf_end: &mut usize,
+    ) -> io::Result<usize> {
+        buf[..*back_buf_end].copy_from_slice(&back_buf[..*back_buf_end]);
+        let read_len = stream.read(&mut buf[*back_buf_end..])?;
+        let read_len = *back_buf_end + read_len;
+        if read_len == 0 {
+            println!("read len is 0");
+            return Ok(0);
+        }
+
+        let last_newline_idx = buf[..read_len]
+            .iter()
+            .rposition(|&c| c == b'\n')
+            .unwrap_or(0);
+
+        let mut chunk_len: usize = 0;
+        if last_newline_idx == 0 {
+            *back_buf_end = read_len;
+        } else {
+            chunk_len = last_newline_idx + 1;
+            *back_buf_end = read_len - last_newline_idx - 1;
+        }
+        back_buf[..*back_buf_end].copy_from_slice(&buf[chunk_len..read_len]);
+        Ok(chunk_len)
+    }
+    pub fn parse_request(buf: &[u8; BUF_SIZE], chunk_len: usize) -> Vec<Request> {
+        let mut v: Vec<Request> = Vec::new();
+        let mut start_i: usize = 0;
+        for i in 0..chunk_len {
+            if buf[i] == b'\n' {
+                match serde_json::from_slice(&buf[start_i..i]) {
+                    Ok(request) => v.push(request),
+                    Err(err) => {
+                        let slice_as_string = std::str::from_utf8(&buf[start_i..i]).unwrap();
+                        println!("- not valid json format : {:?}", slice_as_string);
+                        println!("- error : {:?}", err);
+                    }
+                }
+                start_i = i + 1;
+            }
+            if buf[i] == b'\0' {
+                break;
+            }
+        }
+        v
+    }    
+    fn is_prime_request(request: &Request) -> Option<bool> {
+        let result: bool = match request.method {
+            "isPrime" => match request.number {
+                _ => is_prime(&request.number),
+            },
+            _ => {
+                return None;
+            }
+        };
+        Some(result)
+    }    
+    fn is_prime(number: &serde_json::Number) -> bool {
+        if let Some(n) = number.as_i64() {
+            if n <= 0 || n == 1 {
+                return false;
+            }
+            let max = (n as f64).sqrt() as i64 + 1;
+            for i in 2..max {
+                if n % i == 0 {
+                    return false;
+                }
+            }
+            true
+        } else if let Some(_) = number.as_f64() {
+            // Handle floating point numbers separately
+            // ...
+            false
+        } else {
+            false
         }
     }
     #[cfg(test)]
