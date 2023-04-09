@@ -18,6 +18,30 @@ pub mod prime_time_server {
         method: &'a str,
         prime: bool,
     }
+    pub fn run_server(ip: &str, port: u32) {
+        match TcpListener::bind(format!("{ip}:{port}")) {
+            Ok(listener) => {
+                println!("wait client...");
+                for stream in listener.incoming() {
+                    match stream {
+                        Ok(stream) => {
+                            println!("accept client...");
+                            thread::spawn(|| {
+                                reponse(stream);
+                            });
+                            println!("get next connect");
+                        }
+                        Err(err) => {
+                            println!("incoming error : {}", err);
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                println!("tco bind error : {}", err);
+            }
+        }
+    }    
     // chuck read using buf and back_buf and back_buf_len
     fn reponse(mut stream: TcpStream) {
         println!(
@@ -61,12 +85,11 @@ pub mod prime_time_server {
                                     method: request.method,
                                     prime: is_prime,
                                 };
-                                let response_text: String =
-                                    serde_json::to_string(&response).unwrap();
-                                wirte_buf[wirte_buf_len..wirte_buf_len + response_text.len()]
-                                    .copy_from_slice(response_text.as_bytes());
-                                wirte_buf[wirte_buf_len + response_text.len()] = b'\n';
-                                wirte_buf_len += response_text.len() + 1;
+                                wirte_buf_len = append_line(
+                                    serde_json::to_string(&response).unwrap(),
+                                    wirte_buf,
+                                    wirte_buf_len,
+                                );
                                 if wirte_buf_len >= BUF_SIZE {
                                     stream.write_all(&wirte_buf[..wirte_buf_len]).unwrap();
                                     wirte_buf_len = 0;
@@ -94,30 +117,6 @@ pub mod prime_time_server {
             }
         }
         println!("connection closed");
-    }
-    pub fn run_server(ip: &str, port: u32) {
-        match TcpListener::bind(format!("{ip}:{port}")) {
-            Ok(listener) => {
-                println!("wait client...");
-                for stream in listener.incoming() {
-                    match stream {
-                        Ok(stream) => {
-                            println!("accept client...");
-                            thread::spawn(|| {
-                                reponse(stream);
-                            });
-                            println!("get next connect");
-                        }
-                        Err(err) => {
-                            println!("incoming error : {}", err);
-                        }
-                    }
-                }
-            }
-            Err(err) => {
-                println!("tco bind error : {}", err);
-            }
-        }
     }
     pub fn chunk_read(
         mut stream: impl Read,
@@ -168,7 +167,7 @@ pub mod prime_time_server {
             }
         }
         v
-    }    
+    }
     fn is_prime_request(request: &Request) -> Option<bool> {
         let result: bool = match request.method {
             "isPrime" => match request.number {
@@ -179,7 +178,7 @@ pub mod prime_time_server {
             }
         };
         Some(result)
-    }    
+    }
     fn is_prime(number: &serde_json::Number) -> bool {
         if let Some(n) = number.as_i64() {
             if n <= 0 || n == 1 {
@@ -199,6 +198,16 @@ pub mod prime_time_server {
         } else {
             false
         }
+    }
+    fn append_line(
+        response_text: String,
+        wirte_buf: &mut [u8; BUF_SIZE],
+        wirte_buf_len: usize,
+    ) -> usize {
+        wirte_buf[wirte_buf_len..wirte_buf_len + response_text.len()]
+            .copy_from_slice(response_text.as_bytes());
+        wirte_buf[wirte_buf_len + response_text.len()] = b'\n';
+        wirte_buf_len + response_text.len() + 1
     }
     #[cfg(test)]
     pub mod tests {
@@ -387,7 +396,6 @@ pub mod prime_time_server {
                 .as_bytes()
             );
         }
-
         #[test]
         fn test_parse_multiline_800_requst() {
             let mut buf = [0; BUF_SIZE];
@@ -416,6 +424,14 @@ pub mod prime_time_server {
                 println!("Chunk: {}", s);
                 assert_eq!(&buf[chunk_len - 1], &b'\n', "800 valid request");
             }
+            #[test]
+            fn test_append_line() {
+                let mut wirte_buf = [0; BUF_SIZE];
+                let mut wirte_buf_len: usize = 0;
+                let response_text = "hello world".to_string();
+                wirte_buf_len = append_line(response_text, &mut wirte_buf, wirte_buf_len);
+                assert_eq!(&wirte_buf[..wirte_buf_len], "hello world\n".as_bytes());
+            }            
         }
     }
 }
