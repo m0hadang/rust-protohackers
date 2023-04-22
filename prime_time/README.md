@@ -46,3 +46,5 @@ Make sure you can handle at least 5 simultaneous clients.
   - 필드의 타입이 부정확한 경우
 - Whenever you receive a malformed request, send back a single malformed response, and disconnect the client.
   - malformed request를 받을 경우 malformed repose를 반환하고 세션을 끝는다.
+- Make sure you can handle at least 5 simultaneous clients.
+  - 동시에 5 클라이언트 처리 가능

@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 smoke_test = { path = "smoke_test", version = "0.1.0" }
 prime_time = { path = "prime_time", version = "0.1.0" }
+means_to_an_end = { path = "means_to_an_end", version = "0.1.0" }
